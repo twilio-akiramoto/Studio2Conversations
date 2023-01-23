@@ -1,0 +1,298 @@
+{
+    "description": "Assignment Satisfaction SMS Survey v2",
+    "states": [
+      {
+        "name": "Trigger",
+        "type": "trigger",
+        "transitions": [
+          {
+            "event": "incomingMessage"
+          },
+          {
+            "event": "incomingCall"
+          },
+          {
+            "next": "get_customer_data",
+            "event": "incomingConversationMessage"
+          },
+          {
+            "event": "incomingRequest"
+          },
+          {
+            "event": "incomingParent"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 10,
+            "y": -310
+          }
+        }
+      },
+      {
+        "name": "first_question",
+        "type": "send-and-wait-for-reply",
+        "transitions": [
+          {
+            "next": "check_response_1",
+            "event": "incomingMessage"
+          },
+          {
+            "event": "timeout"
+          },
+          {
+            "event": "deliveryFailure"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 280,
+            "y": 110
+          },
+          "from": "{{flow.channel.address}}",
+          "body": "Thank you  {{widgets.get_customer_data.name}} !  How was your fitst day at {{widgets.get_customer_data.job}}? (1=bad, 5=good)",
+          "timeout": "3600"
+        }
+      },
+      {
+        "name": "check_response_1",
+        "type": "split-based-on",
+        "transitions": [
+          {
+            "next": "unknown_answer_1",
+            "event": "noMatch"
+          },
+          {
+            "next": "not_good_day",
+            "event": "match",
+            "conditions": [
+              {
+                "friendly_name": "1-3",
+                "arguments": [
+                  "{{widgets.first_question.inbound.Body}}"
+                ],
+                "type": "regex",
+                "value": "^(?:[1-2]|0[1-2]|3)$"
+              }
+            ]
+          },
+          {
+            "event": "match",
+            "conditions": [
+              {
+                "friendly_name": "4-5",
+                "arguments": [
+                  "{{widgets.first_question.inbound.Body}}"
+                ],
+                "type": "regex",
+                "value": "^(?:[4-4]|0[4-4]|5)$"
+              }
+            ]
+          }
+        ],
+        "properties": {
+          "input": "{{widgets.first_question.inbound.Body}}",
+          "offset": {
+            "x": 170,
+            "y": 410
+          }
+        }
+      },
+      {
+        "name": "unknown_answer_1",
+        "type": "send-message",
+        "transitions": [
+          {
+            "next": "first_question",
+            "event": "sent"
+          },
+          {
+            "event": "failed"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": -310,
+            "y": 250
+          },
+          "from": "{{flow.channel.address}}",
+          "to": "{{contact.channel.address}}",
+          "body": "I'm sorry, I didn't understand. Please enter a number from 1 - 5."
+        }
+      },
+      {
+        "name": "unknown_answer_2",
+        "type": "send-message",
+        "transitions": [
+          {
+            "next": "not_good_day",
+            "event": "sent"
+          },
+          {
+            "event": "failed"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": -240,
+            "y": 680
+          },
+          "from": "{{flow.channel.address}}",
+          "to": "{{contact.channel.address}}",
+          "body": "We did not receive a response."
+        }
+      },
+      {
+        "name": "switching_agent_message",
+        "type": "send-message",
+        "transitions": [
+          {
+            "next": "frontline",
+            "event": "sent"
+          },
+          {
+            "event": "failed"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 360,
+            "y": 1230
+          },
+          "from": "{{flow.channel.address}}",
+          "to": "{{contact.channel.address}}",
+          "body": "Thank you for your feedback."
+        }
+      },
+      {
+        "name": "send_results_to_server",
+        "type": "make-http-request",
+        "transitions": [
+          {
+            "next": "switching_agent_message",
+            "event": "success"
+          },
+          {
+            "event": "failed"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 350,
+            "y": 980
+          },
+          "method": "POST",
+          "parameters": [
+            {
+              "value": "{{widgets.first_question.inbound.Body}} ",
+              "key": "first_day_rate"
+            },
+            {
+              "value": "{{widgets.not_good_day.inbound.Body}}",
+              "key": "negative_feedback"
+            }
+          ],
+          "url": "https://webhook.site/e33061fc-04e3-43f6-b86a-5330b1239ca9",
+          "timeout": 3600
+        }
+      },
+      {
+        "name": "not_good_day",
+        "type": "send-and-wait-for-reply",
+        "transitions": [
+          {
+            "next": "send_results_to_server",
+            "event": "incomingMessage"
+          },
+          {
+            "next": "unknown_answer_2",
+            "event": "timeout"
+          },
+          {
+            "event": "deliveryFailure"
+          }
+        ],
+        "properties": {
+          "offset": {
+            "x": 350,
+            "y": 690
+          },
+          "service": "{{trigger.message.InstanceSid}}",
+          "channel": "{{trigger.message.ChannelSid}}",
+          "from": "{{flow.channel.address}}",
+          "body": "I'm sorry you did not have a great first day. Can you share any specific feedback?",
+          "timeout": "3600"
+        }
+      },
+      {
+        "name": "frontline",
+        "type": "run-function",
+        "transitions": [
+          {
+            "event": "success"
+          },
+          {
+            "event": "fail"
+          }
+        ],
+        "properties": {
+          "service_sid": "ZSf8636926ce0847a175ac8ecd423223d1",
+          "environment_sid": "ZE3e2d82ead1ab6f513c7eb20d2a438b2a",
+          "offset": {
+            "x": 370,
+            "y": 1470
+          },
+          "function_sid": "ZH016ccbdb489449e96baa0016d865827d",
+          "parameters": [
+            {
+              "value": "{{widgets.not_good_day.inbound.Body}}",
+              "key": "reason"
+            },
+            {
+              "value": "{{flow.channel.address}}",
+              "key": "conversationSID"
+            },
+            {
+              "value": "{{trigger.conversation.WebhookSid}}",
+              "key": "WebhookSid"
+            }
+          ],
+          "url": "https://studio2conversations-2765-dev.twil.io/AddFrontlineAgent"
+        }
+      },
+      {
+        "name": "get_customer_data",
+        "type": "set-variables",
+        "transitions": [
+          {
+            "next": "first_question",
+            "event": "next"
+          }
+        ],
+        "properties": {
+          "variables": [
+            {
+              "value": "Mike",
+              "key": "name"
+            },
+            {
+              "value": "Smith Store",
+              "key": "job"
+            },
+            {
+              "value": "{{flow.channel.address}}",
+              "key": "conversationSID"
+            }
+          ],
+          "offset": {
+            "x": 270,
+            "y": -120
+          }
+        }
+      }
+    ],
+    "initial_state": "Trigger",
+    "flags": {
+      "allow_concurrent_calls": true
+    }
+  }
